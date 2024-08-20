@@ -6,8 +6,8 @@ A game written in Zig for the [WASM-4](https://wasm4.org) runtime.
 
 Build-time dependencies:
 
-- [wasm4 cli](https://github.com/aduros/wasm4/pull/677) (2.6.x)
-- [Zig](https://ziglang.org/download/) (0.12.0-dev.1735+bece97ef2)
+- [wasm4 cli](https://github.com/aduros/wasm4) (latest)
+- [Zig](https://ziglang.org/download/) (0.13.0)
 
 ```
 zig build [steps] [options]
