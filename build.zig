@@ -20,20 +20,24 @@ const Icon = union(enum) {
     url: []const u8,
 };
 
+
 fn addCart(b: *std.Build, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
+    
+    const wasm_target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    });
+
     const cart = b.addExecutable(.{
         .name = "cart",
-        .root_source_file = .{ .path = cart_info.root_source_file },
-        .target = .{
-            .cpu_arch = .wasm32,
-            .os_tag = .freestanding,
-        },
+        .root_source_file = b.path(cart_info.root_source_file),
+        .target = wasm_target,
         .optimize = optimize,
         .version = cart_info.version,
     });
 
     cart.entry = .disabled;
-    cart.export_symbol_names = &.{ "start", "update" };
+    cart.root_module.export_symbol_names = &.{ "start", "update" };
     cart.import_memory = true;
     cart.initial_memory = std.wasm.page_size;
     cart.max_memory = std.wasm.page_size;
@@ -41,7 +45,7 @@ fn addCart(b: *std.Build, optimize: std.builtin.OptimizeMode) *std.Build.Step.Co
 
     const build_time_options = b.addOptions();
     build_time_options.addOption(std.SemanticVersion, "version", cart_info.version);
-    cart.addOptions("build_time_options", build_time_options);
+    cart.root_module.addOptions("build_time_options", build_time_options);
 
     return cart;
 }

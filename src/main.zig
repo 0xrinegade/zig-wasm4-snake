@@ -1,62 +1,75 @@
 const std = @import("std");
-const assert = std.debug.assert;
-const w4 = @import("wasm4.zig");
-const w4_vendor = @import("vendor/wasm4.zig");
-const build_time_options = @import("build_time_options");
-const version_text = std.fmt.comptimePrint("v{}", .{build_time_options.version});
 
-const smiley = w4.Bitmap(
-    \\
-    \\     x x x x    
-    \\   x x x x x x  
-    \\ x x   x x   x x
-    \\ x x   x x   x x
-    \\ x x x x x x x x
-    \\ x x o - - o x x
-    \\   x - o o - x  
-    \\     x x x x    
-,
-    "x o-",
-){};
+const w4 = @import("./vendor/wasm4.zig");
+const Point = @import("snake.zig").Point;
+const Snake = @import("snake.zig").Snake;
 
-var input: w4.Input = undefined;
+var prng: std.rand.DefaultPrng = undefined;
+var random: std.rand.Random = undefined;
+
+const fruit_sprite = [16]u8{ 0x00, 0xa0, 0x02, 0x00, 0x0e, 0xf0, 0x36, 0x5c, 0xd6, 0x57, 0xd5, 0x57, 0x35, 0x5c, 0x0f, 0xf0 };
+var snake: Snake = undefined;
+var frame_count: u32 = 0;
+var prev_state: u8 = 0;
+var fruit: Point = .{ .x = 10, .y = 10 };
 
 export fn start() void {
-    input = w4.Input.init(0);
+    prng = std.rand.DefaultPrng.init(0);
+    random = prng.random();
 
-    w4.setState(.{
-        .color_palette = .{
-            w4.Color.white,
-            w4.Color.black,
-            w4.Color.red,
-            w4.Color.grellow,
-        },
-    });
+    snake.reset();
+
+    w4.PALETTE.* = .{
+        0xfbf7f3,
+        0xe5b083,
+        0x426e5d,
+        0x20283d,
+    };
+}
+
+fn input() void {
+    const just_pressed: u8 = w4.GAMEPAD1.* & (w4.GAMEPAD1.* ^ prev_state);
+
+    if (just_pressed & w4.BUTTON_DOWN != 0) {
+        snake.down();
+    }
+    if (just_pressed & w4.BUTTON_UP != 0) {
+        snake.up();
+    }
+    if (just_pressed & w4.BUTTON_LEFT != 0) {
+        snake.left();
+    }
+    if (just_pressed & w4.BUTTON_RIGHT != 0) {
+        snake.right();
+    }
+
+    prev_state = w4.GAMEPAD1.*;
 }
 
 export fn update() void {
-    defer input.update();
+    frame_count += 1;
 
-    w4.setState(.{
-        .color_channels = .{ 1, null, null, null },
-    });
+    input();
 
-    w4.text("Hello from\nZig!", 10, 10);
-    w4.text(version_text, 160 - version_text.len * 8, 152);
+    if (frame_count % 15 == 0) {
+        snake.update();
 
-    const x_pressed = input.isDown(.button_x);
+        if (std.meta.eql(snake.body[0], fruit)) {
+            snake.grow();
 
-    w4.setState(.{
-        .color_channels = if (x_pressed)
-            .{ 2, null, 2, 1 }
-        else
-            .{ 1, null, null, 1 },
-    });
+            fruit = Point{
+                .x = random.intRangeLessThan(i32, 0, 20),
+                .y = random.intRangeLessThan(i32, 0, 20),
+            };
+        }
 
-    smiley.blit(76, 76, .none);
+        if (snake.isDead()) {
+            snake.reset();
+        }
+    }
 
-    if (x_pressed) w4.setState(.{
-        .color_channels = .{ 3, 1, null, null },
-    });
-    w4.text("Press " ++ w4.KeyCode.button_x.str() ++ " to blink", 16, 90);
+    snake.draw();
+
+    w4.DRAW_COLORS.* = 0x4320;
+    w4.blit(&fruit_sprite, fruit.x * 8, fruit.y * 8, 8, 8, w4.BLIT_2BPP);
 }
